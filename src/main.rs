@@ -1,6 +1,12 @@
 use std::{collections::HashMap, env};
 
-use procfs::{process::{Process, Stat, FDTarget}, net::TcpState};
+use procfs::{process::{Stat, FDTarget}, net::TcpState};
+
+struct ProcessInfo {
+    cmd: String,
+    exe: String,
+    parent_pid: i32,
+}
 
 fn main() {
     let args: Vec<_> = env::args().collect();
@@ -10,25 +16,29 @@ fn main() {
     
     // build up a map between socket inodes and process stat info:
     let mut inode_map: HashMap<u64, Stat> = HashMap::new();
-    let mut process_map: HashMap<i32, (String, i32, String)> = HashMap::new();
+    let mut process_map: HashMap<i32, ProcessInfo> = HashMap::new();
     for p in all_procs {
-        let process = p.unwrap();
-        let mut ppid = 0;
-        if let (Ok(stat), Ok(fds)) = (process.stat(), process.fd()) {
-            ppid = stat.ppid;
-            for fd in fds {
-                match fd.unwrap().target {
-                    FDTarget::Socket(inode) => inode_map.insert(inode, stat.clone()),
-                    FDTarget::Path(inode) => None,
-                    e => None,
-                };
+        if let Ok(process) = p {
+            let mut ppid = 0;
+            if let (Ok(stat), Ok(fds)) = (process.stat(), process.fd()) {
+                ppid = stat.ppid;
+                for fd in fds {
+                    match fd.unwrap().target {
+                        FDTarget::Socket(inode) => inode_map.insert(inode, stat.clone()),
+                        _ => None,
+                    };
+                }
             }
+            let mut exe = String::from("?");
+            if let Ok(str) = process.exe() {
+                exe = str.to_str().unwrap().to_string();
+            }
+            process_map.insert(process.pid, ProcessInfo{
+                cmd: process.cmdline().unwrap().join(" "),
+                exe: exe,
+                parent_pid: ppid,
+            });
         }
-        let mut exe = String::from("?");
-        if let Ok(str) = process.exe() {
-            exe = str.to_str().unwrap().to_string();
-        }
-        process_map.insert(process.pid, (process.cmdline().unwrap().join(" "), ppid, exe));
     }
 
     println!("{:<8} {:<26} {:<26}", "PID", "EXE", "CMD");
@@ -50,14 +60,15 @@ fn main() {
                         break;
                     }
                     if let Some(process) = process_map.get(pid) {
-                        println!("{:<8} {:<26} {:<26}", pid, process.2, process.0);
-                        pid = &process.1;
+                        println!("{:<8} {:<26} {:<26}", pid, process.exe, process.cmd);
+                        pid = &process.parent_pid;
                     } else {
+                        println!("{pid}");
                         pid = &0;
                     }
                 }
             } else {
-                
+                println!("{:<8} {:<26} {:<26}", "?", "?", "?");
             }
         }
         /* if let Some(stat) = map.get(&entry.inode) {
