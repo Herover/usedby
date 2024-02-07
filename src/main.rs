@@ -8,6 +8,8 @@ struct ProcessInfo {
     parent_pid: i32,
 }
 
+const unknown_indicator: &str = "?";
+
 fn main() {
     let args: Vec<_> = env::args().collect();
     let target_port = u16::from_str_radix(&args[1], 10).unwrap();
@@ -29,7 +31,7 @@ fn main() {
                     };
                 }
             }
-            let mut exe = String::from("?");
+            let mut exe = String::from(unknown_indicator);
             if let Ok(str) = process.exe() {
                 exe = str.to_str().unwrap().to_string();
             }
@@ -41,7 +43,7 @@ fn main() {
         }
     }
 
-    println!("{:<8} {:<26} {:<26}", "PID", "EXE", "CMD");
+    println!("{:<8} {:<8} {:<26} {:<26}", "PID", "UID", "EXE", "CMD");
 
     // get the tcp table
     let tcp = procfs::net::tcp().unwrap();
@@ -51,7 +53,7 @@ fn main() {
         // let local_address = format!("{}", entry.local_address);
         // let remote_addr = format!("{}", entry.remote_address);
         // let state = format!("{:?}", entry.state);
-        
+
         if entry.local_address.port() == target_port && entry.state == TcpState::Listen {
             if let Some(stat) = inode_map.get(&entry.inode) {
                 let mut pid = &stat.pid;
@@ -60,7 +62,7 @@ fn main() {
                         break;
                     }
                     if let Some(process) = process_map.get(pid) {
-                        println!("{:<8} {:<26} {:<26}", pid, process.exe, process.cmd);
+                        println!("{:<8} {:<8} {:<26} {:<26}", pid, entry.uid, process.exe, process.cmd);
                         pid = &process.parent_pid;
                     } else {
                         println!("{pid}");
@@ -68,7 +70,7 @@ fn main() {
                     }
                 }
             } else {
-                println!("{:<8} {:<26} {:<26}", "?", "?", "?");
+                println!("{:<8} {:<8} {:<26} {:<26}", unknown_indicator, entry.uid, unknown_indicator, unknown_indicator);
             }
         }
         /* if let Some(stat) = map.get(&entry.inode) {
