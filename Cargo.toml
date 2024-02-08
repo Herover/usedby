@@ -1,6 +1,6 @@
 [package]
 name = "usedby"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Small utility to see what us using a network port"
 license = "MIT"
