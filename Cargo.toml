@@ -2,6 +2,9 @@
 name = "usedby"
 version = "0.1.0"
 edition = "2021"
+description = "Small utility to see what us using a network port"
+license = "MIT"
+repository = "https://github.com/Herover/usedby"
 
 [dependencies]
 procfs = "0.16.0"
