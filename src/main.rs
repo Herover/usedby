@@ -45,14 +45,16 @@ fn main() {
 
     println!("{:<8} {:<8} {:<26} {:<26}", "PID", "UID", "EXE", "CMD");
 
+    let mut is_first = true;
+
     // get the tcp table
     let tcp = procfs::net::tcp().unwrap();
     let tcp6 = procfs::net::tcp6().unwrap();
     for entry in tcp.into_iter().chain(tcp6) {
-        // find the process (if any) that has an open FD to this entry's inode
-        // let local_address = format!("{}", entry.local_address);
-        // let remote_addr = format!("{}", entry.remote_address);
-        // let state = format!("{:?}", entry.state);
+        if !is_first {
+            println!();
+        }
+        is_first = false;
 
         if entry.local_address.port() == target_port && entry.state == TcpState::Listen {
             if let Some(stat) = inode_map.get(&entry.inode) {
