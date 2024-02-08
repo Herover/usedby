@@ -51,12 +51,12 @@ fn main() {
     let tcp = procfs::net::tcp().unwrap();
     let tcp6 = procfs::net::tcp6().unwrap();
     for entry in tcp.into_iter().chain(tcp6) {
-        if !is_first {
-            println!();
-        }
-        is_first = false;
-
         if entry.local_address.port() == target_port && entry.state == TcpState::Listen {
+            if !is_first {
+                println!();
+            }
+            is_first = false;
+    
             if let Some(stat) = inode_map.get(&entry.inode) {
                 let mut pid = &stat.pid;
                 loop {
