@@ -1,11 +1,12 @@
 use std::{collections::HashMap, env};
 
-use procfs::{process::{Stat, FDTarget}, net::TcpState};
+use procfs::{process::{Stat, FDTarget}, net::TcpState, ProcResult};
 
 struct ProcessInfo {
     cmd: String,
     exe: String,
     parent_pid: i32,
+    uid: ProcResult<u32>,
 }
 
 const unknown_indicator: &str = "?";
@@ -39,6 +40,7 @@ fn main() {
                 cmd: process.cmdline().unwrap().join(" "),
                 exe: exe,
                 parent_pid: ppid,
+                uid: process.uid(),
             });
         }
     }
@@ -64,7 +66,7 @@ fn main() {
                         break;
                     }
                     if let Some(process) = process_map.get(pid) {
-                        println!("{:<8} {:<8} {:<26} {:<26}", pid, entry.uid, process.exe, process.cmd);
+                        println!("{:<8} {:<8} {:<26} {:<26}", pid, process.uid.as_ref().map_or(String::from(unknown_indicator), |v| format!("{}", v)), process.exe, process.cmd);
                         pid = &process.parent_pid;
                     } else {
                         println!("{pid}");
