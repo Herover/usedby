@@ -1,6 +1,6 @@
 Small linux utility to identify why a port is being used, and which process is listening on it.
 
-Usage: compile and run `why 8080`, or just `cargo run 8080`. It will print something like
+Usage: compile and run `usedby 8080`, or just `cargo run 8080`. It will print something like
 
 ```
 PID      EXE                        CMD                       
