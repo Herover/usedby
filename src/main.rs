@@ -6,6 +6,7 @@ use procfs::{
 };
 
 struct ProcessInfo {
+    pid: i32,
     cmd: String,
     exe: String,
     parent_pid: i32,
@@ -42,6 +43,7 @@ fn main() {
             process_map.insert(
                 process.pid,
                 ProcessInfo {
+                    pid: process.pid,
                     cmd: process.cmdline().unwrap().join(" "),
                     exe: exe,
                     parent_pid: ppid,
@@ -72,7 +74,7 @@ fn main() {
                 for process in processes {
                     println!(
                         "{:<8} {:<8} {:<26} {:<26}",
-                        pid,
+                        process.pid,
                         process.uid.map_or(String::from("?"), |v| format!("{}", v)),
                         process.exe,
                         process.cmd
@@ -97,6 +99,7 @@ fn get_process_parents(
         let mut parents = get_process_parents(process.parent_pid, inode_map, process_map);
         // FIXME: these .to_owned() feels silly...
         parents.push(ProcessInfo {
+            pid: process.pid.to_owned(),
             uid: process.uid.to_owned(),
             cmd: process.cmd.to_owned(),
             exe: process.exe.to_owned(),
