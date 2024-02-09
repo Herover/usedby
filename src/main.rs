@@ -1,6 +1,9 @@
 use std::{collections::HashMap, env};
 
-use procfs::{process::{Stat, FDTarget, Process}, net::TcpState, ProcResult};
+use procfs::{
+    net::TcpState,
+    process::{FDTarget, Stat},
+};
 
 struct ProcessInfo {
     cmd: String,
@@ -9,14 +12,14 @@ struct ProcessInfo {
     uid: Option<u32>,
 }
 
-const unknown_indicator: &str = "?";
+const UNKNOWN_INDICATOR: &str = "?";
 
 fn main() {
     let args: Vec<_> = env::args().collect();
     let target_port = u16::from_str_radix(&args[1], 10).unwrap();
 
     let all_procs = procfs::process::all_processes().unwrap();
-    
+
     // build up a map between socket inodes and process stat info:
     let mut inode_map: HashMap<u64, Stat> = HashMap::new();
     let mut process_map: HashMap<i32, ProcessInfo> = HashMap::new();
@@ -32,16 +35,19 @@ fn main() {
                     };
                 }
             }
-            let mut exe = String::from(unknown_indicator);
+            let mut exe = String::from(UNKNOWN_INDICATOR);
             if let Ok(str) = process.exe() {
                 exe = str.to_str().unwrap().to_string();
             }
-            process_map.insert(process.pid, ProcessInfo{
-                cmd: process.cmdline().unwrap().join(" "),
-                exe: exe,
-                parent_pid: ppid,
-                uid: process.uid().map_or(None, |v| Some(v)),
-            });
+            process_map.insert(
+                process.pid,
+                ProcessInfo {
+                    cmd: process.cmdline().unwrap().join(" "),
+                    exe: exe,
+                    parent_pid: ppid,
+                    uid: process.uid().map_or(None, |v| Some(v)),
+                },
+            );
         }
     }
 
@@ -64,30 +70,51 @@ fn main() {
                 let mut processes = get_process_parents(*pid, &inode_map, &process_map);
                 processes.reverse();
                 for process in processes {
-                    
-                    println!("{:<8} {:<8} {:<26} {:<26}", pid, process.uid.map_or(String::from("?"), |v| format!("{}", v)), process.exe, process.cmd);
+                    println!(
+                        "{:<8} {:<8} {:<26} {:<26}",
+                        pid,
+                        process.uid.map_or(String::from("?"), |v| format!("{}", v)),
+                        process.exe,
+                        process.cmd
+                    );
                 }
             } else {
-                println!("{:<8} {:<8} {:<26} {:<26}", unknown_indicator, entry.uid, unknown_indicator, unknown_indicator);
+                println!(
+                    "{:<8} {:<8} {:<26} {:<26}",
+                    UNKNOWN_INDICATOR, entry.uid, UNKNOWN_INDICATOR, UNKNOWN_INDICATOR
+                );
             }
         }
     }
 }
 
-fn get_process_parents(pid: i32, inode_map: &HashMap<u64, Stat>, process_map: &HashMap<i32, ProcessInfo>) -> Vec<ProcessInfo> {
+fn get_process_parents(
+    pid: i32,
+    inode_map: &HashMap<u64, Stat>,
+    process_map: &HashMap<i32, ProcessInfo>,
+) -> Vec<ProcessInfo> {
     if let Some(process) = process_map.get(&pid) {
         let mut parents = get_process_parents(process.parent_pid, inode_map, process_map);
         // FIXME: these .to_owned() feels silly...
-        parents.push(ProcessInfo { uid: process.uid.to_owned(), cmd: process.cmd.to_owned(), exe: process.exe.to_owned(), parent_pid: process.parent_pid });
+        parents.push(ProcessInfo {
+            uid: process.uid.to_owned(),
+            cmd: process.cmd.to_owned(),
+            exe: process.exe.to_owned(),
+            parent_pid: process.parent_pid,
+        });
         return parents;
     }
 
     return vec![];
 }
 
-fn get_inode_process_parents(inode: u64, inode_map: &HashMap<u64, Stat>, process_map: &HashMap<i32, ProcessInfo>) -> Vec<ProcessInfo> {
+fn get_inode_process_parents(
+    inode: u64,
+    inode_map: &HashMap<u64, Stat>,
+    process_map: &HashMap<i32, ProcessInfo>,
+) -> Vec<ProcessInfo> {
     if let Some(stat) = inode_map.get(&inode) {
-        return get_process_parents(stat.pid, inode_map, process_map)
+        return get_process_parents(stat.pid, inode_map, process_map);
     }
     return vec![];
 }
