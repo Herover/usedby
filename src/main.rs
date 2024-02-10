@@ -68,14 +68,13 @@ fn main() {
             is_first = false;
 
             if let Some(stat) = inode_map.get(&entry.inode) {
-                let /* mut */ pid = &stat.pid;
-                let mut processes = get_process_parents(*pid, &inode_map, &process_map);
+                let mut processes = get_process_parents(stat.pid, &inode_map, &process_map);
                 processes.reverse();
                 for process in processes {
                     println!(
                         "{:<8} {:<8} {:<26} {:<26}",
                         process.pid,
-                        process.uid.map_or(String::from("?"), |v| format!("{}", v)),
+                        process.uid.map_or(String::from(UNKNOWN_INDICATOR), |v| format!("{}", v)),
                         process.exe,
                         process.cmd
                     );
