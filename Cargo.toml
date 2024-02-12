@@ -1,8 +1,8 @@
 [package]
 name = "usedby"
-version = "0.1.4"
+version = "0.2.0"
 edition = "2021"
-description = "Small utility to see what us using a network port"
+description = "Small utility to see what is using a network port or local file"
 license = "MIT"
 repository = "https://github.com/Herover/usedby"
 
