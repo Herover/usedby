@@ -7,4 +7,5 @@ license = "MIT"
 repository = "https://github.com/Herover/usedby"
 
 [dependencies]
+clap = "4.5.0"
 procfs = "0.16.0"

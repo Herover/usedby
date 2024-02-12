@@ -1,9 +1,9 @@
-use std::{collections::HashMap, env};
-
+use clap::{arg, value_parser, ArgAction, Command};
 use procfs::{
     net::TcpState,
     process::{FDTarget, Stat},
 };
+use std::collections::HashMap;
 
 struct ProcessInfo {
     pid: i32,
@@ -15,10 +15,38 @@ struct ProcessInfo {
 
 const UNKNOWN_INDICATOR: &str = "?";
 
-fn main() {
-    let args: Vec<_> = env::args().collect();
-    let target_port = u16::from_str_radix(&args[1], 10).unwrap();
+fn cli() -> Command {
+    Command::new("usedby")
+        .about("A fictional versioning CLI")
+        .subcommand_required(true)
+        .arg_required_else_help(true)
+        .allow_external_subcommands(true)
+        .subcommand(
+            Command::new("port")
+                .about("Scans for processes currently using a port")
+                .arg(
+                    arg!(<PORT> "Port number")
+                        .value_parser(clap::value_parser!(u16).range(1..65535))
+                        .value_parser(value_parser!(usize))
+                        .action(ArgAction::Set),
+                )
+                .arg_required_else_help(true),
+        )
+        .subcommand(
+            Command::new("file")
+                .about("Scans for processes that currently have a file open")
+                .arg(
+                    arg!(<FILE> "File"), /* .value_parser(clap::value_parser!(PathBuf)) */
+                )
+                .arg_required_else_help(true),
+        )
+}
 
+fn push_args() -> Vec<clap::Arg> {
+    vec![arg!(-m --message <MESSAGE>)]
+}
+
+fn main() {
     let all_procs = procfs::process::all_processes().unwrap();
 
     // build up a map between socket inodes and process stat info:
@@ -53,30 +81,75 @@ fn main() {
         }
     }
 
-    print_header();
-
     let mut is_first = true;
 
-    // get the tcp table
-    let tcp = procfs::net::tcp().unwrap();
-    let tcp6 = procfs::net::tcp6().unwrap();
-    for entry in tcp.into_iter().chain(tcp6) {
-        if entry.local_address.port() == target_port && entry.state == TcpState::Listen {
-            if !is_first {
-                println!();
-            }
-            is_first = false;
+    let matches = cli().get_matches();
+    match matches.subcommand() {
+        Some(("port", sub_matches)) => {
+            let port_number = sub_matches.get_one::<usize>("PORT").unwrap();
 
-            if let Some(stat) = inode_map.get(&entry.inode) {
-                let mut processes = get_process_parents(stat.pid, &inode_map, &process_map);
-                processes.reverse();
-                print_processes(processes, None);
-            } else {
-                print_processes(vec![], Some(entry.uid));
+            print_header();
+            let tcp = procfs::net::tcp().unwrap();
+            let tcp6 = procfs::net::tcp6().unwrap();
+            for entry in tcp.into_iter().chain(tcp6) {
+                if usize::from(entry.local_address.port()) == *port_number
+                    && entry.state == TcpState::Listen
+                {
+                    if !is_first {
+                        println!();
+                    }
+                    is_first = false;
+
+                    if let Some(stat) = inode_map.get(&entry.inode) {
+                        let mut processes = get_process_parents(stat.pid, &inode_map, &process_map);
+                        processes.reverse();
+                        print_processes(processes, None);
+                    } else {
+                        print_processes(vec![], Some(entry.uid));
+                    }
+                }
             }
         }
-    }
+        Some(("file", sub_matches)) => {
+            print_header();
+            let file = sub_matches.get_one::<String>("FILE").unwrap();
 
+            // TODO: consider using `std::file::absolute` instead of `canonicalize` when it's stable.
+            // Main difference is that `cononicalize` will follow symlinks, which might not always be
+            // what the user expects.
+            // TODO: Too much nesting!
+            if let Ok(target_file) = std::fs::canonicalize(file) {
+                for pr in procfs::process::all_processes().unwrap() {
+                    if let Ok(p) = pr {
+                        if let Ok(fds) = p.fd() {
+                            for fdr in fds {
+                                if let Ok(fd) = fdr {
+                                    match fd.target {
+                                        t => match t {
+                                            FDTarget::Path(process_file_path) => {
+                                                if target_file == process_file_path {
+                                                    let mut processes = get_process_parents(
+                                                        p.pid,
+                                                        &inode_map,
+                                                &process_map,
+                                                    );
+                                                    processes.reverse();
+                                                    print_processes(processes, None);
+                                                }
+                                            }
+                                            _ => (),
+                                        },
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Some((&_, _)) => todo!(),
+        None => todo!(),
+    }
 }
 
 // Should be called once before print_processes
@@ -85,8 +158,8 @@ fn print_header() {
 }
 
 /**
- Prints found processes OR a single row with all fields except uid set to unknown indicator.
- */
+Prints found processes OR a single row with all fields except uid set to unknown indicator.
+*/
 fn print_processes(processes: Vec<ProcessInfo>, uid: Option<u32>) {
     if let Some(uid_n) = uid {
         println!(
@@ -98,7 +171,9 @@ fn print_processes(processes: Vec<ProcessInfo>, uid: Option<u32>) {
             println!(
                 "{:<8} {:<8} {:<26} {:<26}",
                 process.pid,
-                process.uid.map_or(String::from(UNKNOWN_INDICATOR), |v| format!("{}", v)),
+                process
+                    .uid
+                    .map_or(String::from(UNKNOWN_INDICATOR), |v| format!("{}", v)),
                 process.exe,
                 process.cmd
             );
