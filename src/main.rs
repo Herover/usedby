@@ -53,7 +53,7 @@ fn main() {
         }
     }
 
-    println!("{:<8} {:<8} {:<26} {:<26}", "PID", "UID", "EXE", "CMD");
+    print_header();
 
     let mut is_first = true;
 
@@ -70,21 +70,38 @@ fn main() {
             if let Some(stat) = inode_map.get(&entry.inode) {
                 let mut processes = get_process_parents(stat.pid, &inode_map, &process_map);
                 processes.reverse();
-                for process in processes {
-                    println!(
-                        "{:<8} {:<8} {:<26} {:<26}",
-                        process.pid,
-                        process.uid.map_or(String::from(UNKNOWN_INDICATOR), |v| format!("{}", v)),
-                        process.exe,
-                        process.cmd
-                    );
-                }
+                print_processes(processes, None);
             } else {
-                println!(
-                    "{:<8} {:<8} {:<26} {:<26}",
-                    UNKNOWN_INDICATOR, entry.uid, UNKNOWN_INDICATOR, UNKNOWN_INDICATOR
-                );
+                print_processes(vec![], Some(entry.uid));
             }
+        }
+    }
+
+}
+
+// Should be called once before print_processes
+fn print_header() {
+    println!("{:<8} {:<8} {:<26} {:<26}", "PID", "UID", "EXE", "CMD");
+}
+
+/**
+ Prints found processes OR a single row with all fields except uid set to unknown indicator.
+ */
+fn print_processes(processes: Vec<ProcessInfo>, uid: Option<u32>) {
+    if let Some(uid_n) = uid {
+        println!(
+            "{:<8} {:<8} {:<26} {:<26}",
+            UNKNOWN_INDICATOR, uid_n, UNKNOWN_INDICATOR, UNKNOWN_INDICATOR
+        );
+    } else {
+        for process in processes {
+            println!(
+                "{:<8} {:<8} {:<26} {:<26}",
+                process.pid,
+                process.uid.map_or(String::from(UNKNOWN_INDICATOR), |v| format!("{}", v)),
+                process.exe,
+                process.cmd
+            );
         }
     }
 }
