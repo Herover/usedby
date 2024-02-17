@@ -17,7 +17,7 @@ const UNKNOWN_INDICATOR: &str = "?";
 
 fn cli() -> Command {
     Command::new("usedby")
-        .about("A fictional versioning CLI")
+        .about("A tool that tells what something is being used by")
         .subcommand_required(true)
         .arg_required_else_help(true)
         .allow_external_subcommands(true)
